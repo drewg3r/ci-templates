@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.0.1](https://github.com/drewg3r/ci-templates/compare/v1.0.0...v1.0.1) (2026-11-09)
+
+
+### Bug Fixes
+
+* major tag propagation ([632cf2a](https://github.com/drewg3r/ci-templates/commit/632cf2a9f7cb49a4cea6f2f3945784ef4f0fabf3))
+
 ## 1.0.0 (2026-11-09)
 
 
