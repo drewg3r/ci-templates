@@ -12,6 +12,8 @@ on:
         value: ${{ jobs.release-please.outputs.tag_name }}
       sha:
         value: ${{ jobs.release-please.outputs.sha }}
+      major:
+        value: ${{ jobs.release-please.outputs.major }}
 
 jobs:
   release-please:
