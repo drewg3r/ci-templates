@@ -42,7 +42,7 @@ jobs:
   release:
     if: github.event_name == 'push'
     needs: build-test
-    uses: drewg3r/ci-templates/.github/workflows/release-please.yaml
+    uses: drewg3r/ci-templates/.github/workflows/release-please.yaml@v1
     permissions:
       contents: write
       pull-requests: write
