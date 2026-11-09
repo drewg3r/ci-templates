@@ -1,0 +1,85 @@
+name: Docker CI
+on:
+  workflow_call:
+    inputs:
+      test-command:
+        type: string
+        required: true
+      context:
+        type: string
+        default: "."
+
+jobs:
+  build-test:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/build-push-action@v6
+        with:
+          context: ${{ inputs.context }}
+          load: true
+          tags: local/app:ci
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      - name: Run tests inside the image
+        env:
+          TEST_CMD: ${{ inputs.test-command }}
+        run: docker run --rm --entrypoint sh local/app:ci -c "$TEST_CMD"
+      - name: Save image
+        if: github.event_name == 'push'
+        run: docker save local/app:ci -o image.tar
+      - name: Upload image artifact
+        if: github.event_name == 'push'
+        uses: actions/upload-artifact@v4
+        with:
+          name: docker-image
+          path: image.tar
+          retention-days: 1
+
+  release:
+    if: github.event_name == 'push'
+    needs: build-test
+    uses: drewg3r/ci-templates/.github/workflows/release-please.yaml
+    permissions:
+      contents: write
+      pull-requests: write
+
+  publish:
+    needs: release
+    if: needs.release.outputs.release_created == 'true'
+    runs-on: ubuntu-latest
+    concurrency:
+      group: publish-${{ github.repository }}
+      cancel-in-progress: false
+    permissions:
+      packages: write
+    steps:
+      - name: Check the release is for the tested commit
+        env:
+          RELEASE_SHA: ${{ needs.release.outputs.sha }}
+        run: |
+          if [ "$RELEASE_SHA" != "$GITHUB_SHA" ]; then
+            echo "Release commit $RELEASE_SHA differs from tested commit $GITHUB_SHA, refusing to publish"
+            exit 1
+          fi
+      - uses: actions/download-artifact@v4
+        with:
+          name: docker-image
+      - run: docker load -i image.tar
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - env:
+          TAG: ${{ needs.release.outputs.tag_name }}
+        run: |
+          IMAGE="ghcr.io/${GITHUB_REPOSITORY,,}"
+          VERSION="${TAG#v}"
+          for t in "$VERSION" "${VERSION%.*}" latest; do
+            docker tag local/app:ci "$IMAGE:$t"
+            docker push "$IMAGE:$t"
+          done
